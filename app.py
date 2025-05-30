@@ -1056,5 +1056,18 @@ def upload_file():
     flash('Invalid file type. Please upload a .docx file')
     return redirect(request.url)
 
+# Vercel handler
+app = app
+
+def vercel_handler(event, context):
+    with app.app_context():
+        response = app.full_dispatch_request()
+        return {
+            'statusCode': response.status_code,
+            'headers': dict(response.headers),
+            'body': response.get_data(as_text=True)
+        }
+
+# For local development
 if __name__ == '__main__':
     app.run(debug=True)
