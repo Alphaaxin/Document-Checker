@@ -1015,70 +1015,79 @@ def upload_file():
     try:
         # Save file data to memory
         file_data = file.read()
+        if not file_data:
+            return jsonify({'error': 'Uploaded file is empty'}), 400
         
         # Create a temporary file with a .docx extension
-        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.docx')
-        temp_file_path = temp_file.name
-        temp_file.write(file_data)
-        temp_file.close()
+        try:
+            temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.docx')
+            temp_file_path = temp_file.name
+            temp_file.write(file_data)
+            temp_file.close()
+        except Exception as e:
+            return jsonify({'error': f'Error creating temporary file: {str(e)}'}), 500
         
         # Process the document
-        checker = DocumentChecker(temp_file_path)
-        issues = checker.check_document()
+        try:
+            checker = DocumentChecker(temp_file_path)
+            issues = checker.check_document()
+        except Exception as e:
+            return jsonify({'error': f'Error processing document: {str(e)}'}), 500
         
         # Process line issues - ensure they're in the correct format
         processed_line_issues = []
-        for issue in (checker.line_issues or []):
-            if isinstance(issue, dict) and 'issues' in issue and issue['issues']:
-                processed_line_issues.append({
-                    'line_number': issue.get('line_number', 0),
-                    'issues': issue['issues'],
-                    'text': issue.get('text', '')
+        try:
+            for issue in (checker.line_issues or []):
+                if isinstance(issue, dict) and 'issues' in issue and issue['issues']:
+                    processed_line_issues.append({
+                        'line_number': issue.get('line_number', 0),
+                        'issues': issue['issues'],
+                        'text': issue.get('text', '')
                     })
-            
+        except Exception as e:
+            print(f"Warning: Error processing line issues: {str(e)}")
+        
         # Count lines with issues
         lines_with_issues = len(processed_line_issues)
             
-            # Prepare the result
-            result = {
-                'filename': secure_filename(file.filename),
-                'timestamp': datetime.now().isoformat(),
-                'issues': issues.get('issues', []) if isinstance(issues, dict) else (issues or []),
-                'summary': {
-                    'total_issues': len(issues.get('issues', [])) if isinstance(issues, dict) else len(issues or []),
-                    'lines_checked': len(checker.line_issues or []),
-                    'lines_with_issues': lines_with_issues,
-                    'sections_checked': checker.sections_checked if hasattr(checker, 'sections_checked') else 0,
-                    'heading_count': len(checker.headings) if hasattr(checker, 'headings') else 0,
-                    'subheading_count': len(checker.subheadings) if hasattr(checker, 'subheadings') else 0
-                },
-                'line_issues': processed_line_issues,
-                'headings': getattr(checker, 'headings', []),
-                'subheadings': getattr(checker, 'subheadings', [])
-            }
-            
-            # Store minimal data in session
+        # Prepare the result
+        result = {
+            'filename': secure_filename(file.filename),
+            'timestamp': datetime.now().isoformat(),
+            'issues': issues.get('issues', []) if isinstance(issues, dict) else (issues or []),
+            'summary': {
+                'total_issues': len(issues.get('issues', [])) if isinstance(issues, dict) else len(issues or []),
+                'lines_checked': len(checker.line_issues or []),
+                'lines_with_issues': lines_with_issues,
+                'sections_checked': checker.sections_checked if hasattr(checker, 'sections_checked') else 0,
+                'heading_count': len(checker.headings) if hasattr(checker, 'headings') else 0,
+                'subheading_count': len(checker.subheadings) if hasattr(checker, 'subheadings') else 0
+            },
+            'line_issues': processed_line_issues,
+            'headings': getattr(checker, 'headings', []),
+            'subheadings': getattr(checker, 'subheadings', [])
+        }
+        
+        # Store minimal data in session
+        try:
             session['last_result'] = {
                 'filename': result['filename'],
                 'timestamp': result['timestamp'],
                 'summary': result['summary']
             }
-            
-            # Return only the result data, not the file
-            return jsonify({
-                'success': True,
-                'result': result
-            })
-            
         except Exception as e:
-            import traceback
-            traceback.print_exc()
-            return jsonify({'error': f'Error preparing results: {str(e)}'}), 500
+            print(f"Warning: Could not store session data: {str(e)}")
+        
+        # Return the result data
+        return jsonify({
+            'success': True,
+            'result': result
+        })
             
     except Exception as e:
         import traceback
         traceback.print_exc()
-        return jsonify({'error': f'Error processing file: {str(e)}'}), 500
+        return jsonify({'error': f'Internal server error: {str(e)}'}), 500
         
     finally:
         # Clean up the temporary file
