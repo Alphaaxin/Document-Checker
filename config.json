@@ -1,0 +1,22 @@
+{
+    "skip_pages": 14,
+    "start_checking_from": "abstract",
+    "required_font": "Times New Roman",
+    "required_font_size": 12,
+    "required_line_spacing": 1.5,
+    "admin_username": "admin",
+    "admin_password": "admin123",
+    "document_checks": [
+        {
+            "filename": "campus_market_.docx",
+            "timestamp": "2025-05-30T12:48:46.404680",
+            "issues_found": 65,
+            "user_ip": "127.0.0.1",
+            "metadata": {
+                "page_count": 22,
+                "line_count": 2491,
+                "sections_checked": 1
+            }
+        }
+    ]
+}

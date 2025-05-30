@@ -1,0 +1,349 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header text-center">
+                <h3 class="mb-0">Document Formatting Analysis</h3>
+                <p class="text-muted mb-0">{{ filename }}</p>
+            </div>
+            <div class="card-body">
+                <!-- Summary Section -->
+                <div class="alert {% if summary.total_issues > 0 %}alert-warning{% else %}alert-success{% endif %} mb-4">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h5 class="alert-heading mb-1">
+                                <i class="bi {% if summary.total_issues > 0 %}bi-exclamation-triangle-fill{% else %}bi-check-circle-fill{% endif %}"></i>
+                                {% if summary.total_issues > 0 %}
+                                    {{ summary.total_issues }} Issues Found
+                                {% else %}
+                                    No Issues Found!
+                                {% endif %}
+                            </h5>
+                            <p class="mb-0">
+                                Scanned {{ summary.lines_checked }} lines in {{ summary.sections_checked }} sections
+                                {% if summary.lines_with_issues > 0 %}
+                                    • {{ summary.lines_with_issues }} lines need attention
+                                {% endif %}
+                                {% if summary.heading_count > 0 %}
+                                    • {{ summary.heading_count }} headings, {{ summary.subheading_count }} subheadings
+                                {% endif %}
+                            </p>
+                        </div>
+                        <button class="btn btn-sm {% if summary.total_issues > 0 %}btn-warning{% else %}btn-success{% endif %}" onclick="window.print()">
+                            <i class="bi bi-printer"></i> Print Report
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Detailed Line-by-Line Analysis -->
+                {% if line_issues %}
+                <div class="mb-4">
+                    <h5 class="border-bottom pb-2 mb-3">
+                        <i class="bi bi-list-check"></i> Line-by-Line Analysis
+                        <small class="text-muted">(showing lines with issues)</small>
+                    </h5>
+                    
+                    <div class="line-issues-container" style="max-height: 500px; overflow-y: auto; color:black">
+                        {% for line_num, data in line_issues %}
+                        <div class="card mb-2 border-{% if data.issues %}danger{% else %}success{% endif %}">
+                            <div class="card-header py-2 d-flex justify-content-between align-items-center bg-light">
+                                <div>
+                                    <span class="font-weight-bold" style="color: rgb(255, 238, 0)">Page {{ data.page_number }}, Line {{ line_num }}:</span>
+                                    {% if data.is_page_break %}
+                                        <span class="badge bg-info ms-2">Page Break</span>
+                                    {% endif %}
+                                </div>
+                                <span class="badge bg-{% if data.issues %}danger{% else %}success{% endif %}">
+                                    {{ data.issues|length }} issue{% if data.issues|length != 1 %}s{% endif %}
+                                </span>
+                            </div>
+                            <div class="card-body p-3">
+                                <div class="mb-2 font-monospace text-muted">
+                                    "{{ data.text }}"
+                                </div>
+                                {% if data.issues %}
+                                <ul class="list-group list-group-flush">
+                                    {% for issue in data.issues %}
+                                    <li class="list-group-item py-2">
+                                        <i class="bi bi-x-circle-fill text-danger"></i> {{ issue }}
+                                    </li>
+                                    {% endfor %}
+                                </ul>
+                                {% else %}
+                                <div class="alert alert-success mb-0 py-2">
+                                    <i class="bi bi-check-circle-fill"></i> No issues found
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Document Structure -->
+                {% if headings or subheadings %}
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="bi bi-list-nested"></i> Document Structure
+                            <small class="text-muted">({{ headings|length }} headings, {{ subheadings|length }} subheadings)</small>
+                        </h5>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="list-group list-group-flush">
+                            {% for heading in headings %}
+                            <div class="list-group-item">
+                                <div class="d-flex w-100 justify-content-between">
+                                    <h6 class="mb-1">
+                                        <i class="bi bi-type-h1 text-primary"></i> {{ heading.text }}
+                                    </h6>
+                                    <small class="text-muted">Page {{ heading.page }}, Line {{ heading.line }}</small>
+                                </div>
+                                {% for subheading in subheadings %}
+                                    {% if subheading.line > heading.line and (loop.last or subheadings[loop.index].line > heading.line) %}
+                                    <div class="ms-4 mt-2">
+                                        <i class="bi bi-type-h2 text-secondary"></i> {{ subheading.text }}
+                                        <small class="text-muted">(Page {{ subheading.page }}, Line {{ subheading.line }})</small>
+                                    </div>
+                                    {% endif %}
+                                {% endfor %}
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- All Issues Summary -->
+                {% if issues %}
+                <div class="mb-4">
+                    <h5 class="border-bottom pb-2 mb-3">
+                        <i class="bi bi-exclamation-triangle-fill"></i> All Formatting Issues
+                    </h5>
+
+                    <div class="list-group">
+                        {% for issue in issues %}
+                        {% set is_dict = issue is mapping %}
+                        <div class="list-group-item list-group-item-action 
+                            {% if is_dict %}
+                                {% if issue.severity == 'high' %}list-group-item-danger
+                                {% elif issue.severity == 'medium' %}list-group-item-warning
+                                {% else %}list-group-item-info{% endif %}
+                            {% endif %}">
+                            <div class="d-flex w-100 justify-content-between">
+                                <div class="d-flex align-items-center">
+                                    {% if is_dict %}
+                                        {% if issue.type == 'warning' or issue.severity == 'high' %}
+                                            <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                                        {% elif issue.severity == 'medium' %}
+                                            <i class="bi bi-info-circle-fill me-2"></i>
+                                        {% else %}
+                                            <i class="bi bi-check-circle-fill me-2"></i>
+                                        {% endif %}
+                                        <span>{{ issue.message }}</span>
+                                    {% else %}
+                                        <span>{{ issue }}</span>
+                                    {% endif %}
+                                </div>
+                                <button class="btn btn-sm btn-outline-primary" 
+                                        data-issue-text="{{ (issue.message if is_dict else issue)|e }}"
+                                        onclick="highlightIssue(this.getAttribute('data-issue-text'))">
+                                    <i class="bi bi-search"></i> Find
+                                </button>
+                            </div>
+                            {% if is_dict and issue.line %}
+                            <div class="text-muted small mt-1">
+                                <i class="bi bi-arrow-return-right"></i> Line {{ issue.line }}
+                            </div>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Quick Fixes -->
+                <div class="card bg-light mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="bi bi-magic"></i> Quick Fixes</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6>Common Fixes:</h6>
+                                <ul>
+                                    <li>Select all (Ctrl+A) and set font to Times New Roman</li>
+                                    <li>Use Styles pane (Ctrl+Alt+Shift+S) for headings</li>
+                                    <li>Set line spacing to exactly 1.79</li>
+                                    <li>Set margins to at least 1.75" on both sides</li>
+                                </ul>
+                            </div>
+                            <div class="col-md-6">
+                                <h6>Page Setup:</h6>
+                                <ul>
+                                    <li>Page Layout > Margins > Custom Margins</li>
+                                    <li>Home > Paragraph > Line Spacing Options</li>
+                                    <li>Insert > Header & Footer for page numbers</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Navigation Buttons -->
+                <div class="d-flex justify-content-between mt-4">
+                    <a href="{{ url_for('index') }}" class="btn btn-outline-secondary">
+                        <i class="bi bi-arrow-left"></i> Back to Home
+                    </a>
+                    <div>
+                        <button class="btn btn-primary" onclick="window.print()">
+                            <i class="bi bi-printer"></i> Print Report
+                        </button>
+                        <a href="{{ url_for('index') }}" class="btn btn-success">
+                            <i class="bi bi-check-circle"></i> Done
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function highlightIssue(issueText) {
+        try {
+            // Normalize the search text by removing extra whitespace and making it lowercase
+            const normalizedSearch = issueText.trim().toLowerCase();
+            
+            // Find all issue elements
+            const issueElements = document.querySelectorAll('.list-group-item');
+            let found = false;
+            
+            // First, remove any existing highlights
+            document.querySelectorAll('.highlight-issue').forEach(el => {
+                el.classList.remove('highlight-issue', 'bg-warning', 'bg-opacity-25');
+            });
+            
+            // Try to find an exact match first
+            for (const el of issueElements) {
+                const itemText = el.textContent.trim().toLowerCase();
+                if (itemText === normalizedSearch || 
+                    itemText.includes(normalizedSearch) ||
+                    normalizedSearch.includes(itemText)) {
+                    
+                    // Scroll to the element
+                    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    
+                    // Add highlight classes
+                    el.classList.add('highlight-issue', 'bg-warning', 'bg-opacity-25');
+                    
+                    // Remove highlight after 5 seconds
+                    setTimeout(() => {
+                        el.classList.remove('highlight-issue', 'bg-warning', 'bg-opacity-25');
+                    }, 5000);
+                    
+                    found = true;
+                    break;
+                }
+            }
+            
+            if (!found) {
+                console.log("Could not find exact match, trying partial match:", issueText);
+                
+                // If no exact match, try to find a partial match
+                for (const el of issueElements) {
+                    const itemText = el.textContent.trim().toLowerCase();
+                    if (itemText.includes(normalizedSearch) || normalizedSearch.includes(itemText)) {
+                        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        el.classList.add('highlight-issue', 'bg-warning', 'bg-opacity-25');
+                        setTimeout(() => {
+                            el.classList.remove('highlight-issue', 'bg-warning', 'bg-opacity-25');
+                        }, 5000);
+                        found = true;
+                        break;
+                    }
+                }
+            }
+            
+            if (!found) {
+                console.log("Could not find issue in document:", issueText);
+                // Show a toast or alert to the user
+                const toast = document.createElement('div');
+                toast.className = 'position-fixed bottom-0 end-0 m-3 p-3 bg-danger text-white rounded';
+                toast.textContent = 'Could not find the selected issue in the document.';
+                document.body.appendChild(toast);
+                setTimeout(() => toast.remove(), 3000);
+            }
+        } catch (e) {
+            console.error("Error highlighting issue:", e);
+            // Show error to user
+            alert('An error occurred while trying to highlight the issue. Please try again.');
+        }
+    }
+    
+    // Auto-expand all line items for printing
+    window.onbeforeprint = function() {
+        const collapsibles = document.querySelectorAll('.collapse');
+        collapsibles.forEach(el => el.classList.add('show'));
+    };
+</script>
+
+<style>
+    /* Custom styles for the results page */
+    .line-issues-container {
+        scroll-behavior: smooth;
+    }
+    
+    .line-issue-card {
+        transition: all 0.3s ease;
+    }
+    
+    .line-issue-card:hover {
+        transform: translateX(5px);
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+    }
+    
+    .highlight-issue {
+        border-left: 4px solid #ffc107 !important;
+        transition: all 0.3s ease;
+    }
+    
+    .font-monospace {
+        font-family: 'Courier New', monospace;
+        background-color: #f8f9fa;
+        padding: 0.5rem;
+        border-radius: 0.25rem;
+        border-left: 3px solid #6c757d;
+    }
+    
+    @media print {
+        .no-print, .no-print * {
+            display: none !important;
+        }
+        
+        body, html {
+            background: white !important;
+            font-size: 12pt;
+        }
+        
+        .card {
+            border: none !important;
+            box-shadow: none !important;
+        }
+        
+        .line-issues-container {
+            max-height: none !important;
+            overflow: visible !important;
+        }
+        
+        .alert {
+            border: 1px solid #dee2e6;
+        }
+    }
+</style>
+{% endblock %}

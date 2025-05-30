@@ -1,0 +1,312 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+    /* Ensure all images are centered */
+    .img-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        margin: 0 auto;
+    }
+    
+    /* Make sure images are responsive */
+    img {
+        max-width: 100%;
+        height: auto;
+        display: block;
+        margin: 0 auto;
+    }
+    
+    /* Specific styling for the hero image */
+    .hero-img-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100%;
+    }
+    
+    /* Ensure feature icons are properly centered */
+    .card .icon-wrapper {
+        width: 60px;
+        height: 60px;
+        margin: 0 auto;
+        background: rgba(16, 185, 129, 0.1);
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.3s ease;
+    }
+    
+    /* Center align all feature section content */
+    .feature-card {
+        text-align: center;
+    }
+    
+    .feature-card .card-body {
+        padding: 1.5rem;
+    }
+</style>
+
+<!-- Hero Section -->
+<div class="hero-section py-4 py-md-5" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%);">
+    <div class="container py-4 py-md-5">
+        <div class="row align-items-center">
+            <div class="col-lg-6 text-white mb-4 mb-lg-0">
+                <h1 class="display-5 fw-bold mb-3" style="font-size: 2.5rem; line-height: 1.2;">Document Format Checker</h1>
+                <p class="lead mb-4" style="font-size: 1.25rem; line-height: 1.6;">Ensure your documents meet the required formatting standards with our easy-to-use tool. Perfect for students, researchers, and professionals.</p>
+                <a href="#upload-section" class="btn btn-light btn-lg px-4 shadow-sm" style="font-size: 1rem;">
+                    <i class="bi bi-upload me-2"></i> Check Your Document
+                </a>
+            </div>
+            <div class="col-lg-6">
+                <div class="hero-img-container">
+                    <img src="https://cdn-icons-png.flaticon.com/512/2933/2933245.png" alt="Document Check" class="img-fluid" style="max-height: 250px; filter: drop-shadow(0 10px 20px rgba(0,0,0,0.1));">
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="wave-shape" style="height: 150px; overflow: hidden;">
+        <svg viewBox="0 0 500 150" preserveAspectRatio="none" style="height: 100%; width: 100%;">
+            <path d="M0.00,49.98 C149.99,150.00 271.49,-49.98 500.00,49.98 L500.00,0.00 L0.00,0.00 Z" style="stroke: none; fill: var(--bg-color);"></path>
+        </svg>
+    </div>
+</div>
+
+<!-- Main Content -->
+<div class="container py-5">
+    <!-- Upload Section -->
+    <section id="upload-section" class="card shadow-lg border-0 mb-5" style="margin-top: -50px; background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(10px);">
+        <div class="card-body p-4 p-lg-5">
+            <div class="text-center mb-4">
+                <h2 class="fw-bold mb-2" style="font-size: 1.75rem;">Check Your Document</h2>
+                <p class="text-muted" style="font-size: 1.1rem;">Upload your .docx file to check if it meets the required formatting standards</p>
+            </div>
+            
+            <form id="uploadForm" action="{{ url_for('upload_file') }}" method="post" enctype="multipart/form-data" onsubmit="return validateForm()">
+                <div class="upload-area p-5 text-center border-2 border-dashed rounded-3 mb-4" id="drop-area" style="background: #f8f9fa; border-color: #e2e8f0 !important; transition: all 0.3s ease;" onmouseover="this.style.borderColor='#10b981'" onmouseout="this.style.borderColor='#e2e8f0'">
+                    <input type="file" name="file" id="file-input" accept=".docx" style="display: none;">
+                    <div id="upload-content">
+                        <i class="bi bi-cloud-arrow-up" style="font-size: 2.5rem; color: #10b981;"></i>
+                        <h5 class="mt-3" style="font-size: 1.15rem;">Drag & Drop your file here</h5>
+                        <p class="text-muted mb-0" style="font-size: 0.95rem;">or</p>
+                        <button type="button" class="btn btn-primary mt-2" onclick="document.getElementById('file-input').click()" style="font-size: 0.95rem;">
+                            <i class="bi bi-folder2-open me-2"></i>Browse Files
+                        </button>
+                        <p class="text-muted mt-3 mb-0" style="font-size: 0.85rem;">Only .docx files are accepted (Max 16MB)</p>
+                    </div>
+                    <div id="file-info" class="d-none">
+                        <div class="d-flex align-items-center justify-content-center mb-3">
+                            <i class="bi bi-file-earmark-word me-3" style="font-size: 2.5rem; color: #10b981;"></i>
+                            <div class="text-start">
+                                <p class="mb-0 fw-bold" id="file-name"></p>
+                                <p class="text-muted small mb-0" id="file-size"></p>
+                            </div>
+                        </div>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="resetFileInput()">
+                            <i class="bi bi-x-circle me-1"></i>Change File
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="d-grid">
+                    <button type="submit" class="btn btn-primary btn-lg rounded-pill py-2 px-4 shadow-sm" id="submit-btn" disabled style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); border: none; transition: all 0.3s ease; font-size: 1rem;" onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 15px rgba(5, 150, 105, 0.4)'" onmouseout="this.style.transform='none'; this.style.boxShadow='none'">
+                    <span id="submit-text">Check Formatting</span>
+                    <span id="submit-spinner" class="spinner-border spinner-border-sm d-none ms-2" role="status" aria-hidden="true"></span>
+                </button>
+                </div>
+            </form>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section class="mb-5">
+        <h2 class="text-center mb-4 fw-bold" style="font-size: 1.75rem;">How It Works</h2>
+        <div class="row g-4">
+            <div class="col-md-4">
+                <div class="card h-100 border-0 shadow-sm feature-card">
+                    <div class="card-body">
+                        <div class="icon-wrapper mb-3">
+                            <i class="bi bi-upload" style="font-size: 1.75rem; color: #10b981;"></i>
+                        </div>
+                        <h5 class="mb-2" style="font-size: 1.1rem;">Upload Document</h5>
+                        <p class="text-muted mb-0" style="font-size: 0.95rem; line-height: 1.5;">Upload your .docx file using the drag & drop area or click to browse.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card h-100 border-0 shadow-sm feature-card">
+                    <div class="card-body">
+                        <div class="icon-wrapper mb-3">
+                            <i class="bi bi-search" style="font-size: 1.75rem; color: #10b981;"></i>
+                        </div>
+                        <h5 class="mb-2" style="font-size: 1.1rem;">Automatic Analysis</h5>
+                        <p class="text-muted mb-0" style="font-size: 0.95rem; line-height: 1.5;">Our system will analyze your document against formatting standards.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card h-100 border-0 shadow-sm feature-card">
+                    <div class="card-body">
+                        <div class="icon-wrapper mb-3">
+                            <i class="bi bi-file-earmark-check" style="font-size: 1.75rem; color: #10b981;"></i>
+                        </div>
+                        <h5 class="mb-2" style="font-size: 1.1rem;">Get Results</h5>
+                        <p class="text-muted mb-0" style="font-size: 0.95rem; line-height: 1.5;">Receive a detailed report of formatting issues and how to fix them.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Formatting Rules -->
+    <section class="mb-5">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white border-0 pt-4">
+                <h3 class="text-center mb-0 fw-bold">Formatting Standards</h3>
+            </div>
+            <div class="card-body">
+                <div class="row g-4">
+                    <div class="col-md-6">
+                        <div class="d-flex">
+                            <div class="me-3 text-primary">
+                                <i class="bi bi-fonts" style="font-size: 1.5rem;"></i>
+                            </div>
+                            <div>
+                                <h5>Font & Text</h5>
+                                <ul class="list-unstyled text-muted mb-0">
+                                    <li class="mb-1"><i class="bi bi-check2 text-success me-2"></i> Font: Times New Roman</li>
+                                    <li class="mb-1"><i class="bi bi-check2 text-success me-2"></i> Size: 12pt (Body), 14pt (Headings), 16pt (Titles)</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="d-flex">
+                            <div class="me-3 text-primary">
+                                <i class="bi bi-text-paragraph" style="font-size: 1.5rem;"></i>
+                            </div>
+                            <div>
+                                <h5>Spacing & Layout</h5>
+                                <ul class="list-unstyled text-muted mb-0">
+                                    <li class="mb-1"><i class="bi bi-check2 text-success me-2"></i> Line Spacing: Exactly 1.79</li>
+                                    <li class="mb-1"><i class="bi bi-check2 text-success me-2"></i> Margins: 1.75" on both sides</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function validateForm() {
+        const fileInput = document.getElementById('file-input');
+        if (!fileInput.files || fileInput.files.length === 0) {
+            alert('Please select a file to upload');
+            return false;
+        }
+        
+        // Show loading state
+        const submitBtn = document.getElementById('submit-btn');
+        const submitText = document.getElementById('submit-text');
+        const spinner = document.getElementById('submit-spinner');
+        
+        submitBtn.disabled = true;
+        submitText.textContent = 'Processing...';
+        spinner.classList.remove('d-none');
+        
+        return true;
+    }
+    
+    // Rest of your existing JavaScript code
+    const dropArea = document.getElementById('drop-area');
+    const fileInput = document.getElementById('file-input');
+    const uploadContent = document.getElementById('upload-content');
+    const fileInfo = document.getElementById('file-info');
+    const fileName = document.getElementById('file-name');
+    const fileSize = document.getElementById('file-size');
+    const submitBtn = document.getElementById('submit-btn');
+
+    // Prevent default drag behaviors
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        dropArea.addEventListener(eventName, preventDefaults, false);
+        document.body.addEventListener(eventName, preventDefaults, false);
+    });
+
+    // Highlight drop area when item is dragged over it
+    ['dragenter', 'dragover'].forEach(eventName => {
+        dropArea.addEventListener(eventName, highlight, false);
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+        dropArea.addEventListener(eventName, unhighlight, false);
+    });
+
+    // Handle dropped files
+    dropArea.addEventListener('drop', handleDrop, false);
+    
+    // Handle file selection via input
+    fileInput.addEventListener('change', handleFiles, false);
+
+    function preventDefaults(e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+
+    function highlight() {
+        dropArea.classList.add('highlight');
+    }
+
+    function unhighlight() {
+        dropArea.classList.remove('highlight');
+    }
+
+    function handleDrop(e) {
+        const dt = e.dataTransfer;
+        const files = dt.files;
+        handleFiles({ target: { files } });
+    }
+
+    function handleFiles(e) {
+        const files = e.target.files;
+        if (files.length > 0) {
+            const file = files[0];
+            if (file.name.endsWith('.docx')) {
+                uploadContent.classList.add('d-none');
+                fileInfo.classList.remove('d-none');
+                fileName.textContent = file.name;
+                fileSize.textContent = formatFileSize(file.size);
+                submitBtn.disabled = false;
+            } else {
+                alert('Please upload a .docx file');
+                resetFileInput();
+            }
+        }
+    }
+
+    function resetFileInput() {
+        if (confirm('Are you sure you want to clear the selected file Bakayaro?')) {
+            fileInput.value = '';
+            uploadContent.classList.remove('d-none');
+            document.getElementById('file-info').classList.add('d-none');
+            document.getElementById('submit-btn').disabled = true;
+            document.getElementById('file-name').textContent = '';
+            document.getElementById('file-size').textContent = '';
+        }
+    }
+
+    function formatFileSize(bytes) {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+</script>
+{% endblock %}
