@@ -745,23 +745,26 @@ class DocumentChecker:
         
     def check_headers_footers(self):
         """Check headers and footers after abstract"""
+        issues = []
         if not self.after_abstract:
-            return
+            return issues
             
         for section in self.doc.sections:
             # Check header
             if section.header:
                 header_text = ' '.join([p.text for p in section.header.paragraphs])
                 if self.rules['required_header'].lower() not in header_text.lower():
-                    self.issues.append(f"Header should contain: '{self.rules['required_header']}'")
+                    issues.append(f"Header should contain: '{self.rules['required_header']}'")
             
             # Check footer
             if section.footer:
                 footer_text = ' '.join([p.text for p in section.footer.paragraphs])
                 if (self.rules['required_footer_left'].lower() not in footer_text.lower() or 
                     'page' not in footer_text.lower()):
-                    self.issues.append(f"Footer should contain department name and page number")
-    
+                    issues.append("Footer should contain department name and page number")
+                    
+        return issues
+            
     def estimate_page_number(self, line_num):
         """Estimate page number based on line number and content"""
         # Convert line_num to int to ensure it's a valid dictionary key
