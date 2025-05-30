@@ -951,13 +951,10 @@ def upload_file():
         return jsonify({'error': 'Invalid file type. Please upload a .docx file'}), 400
     
     try:
-        # Process file in memory
-        file_stream = file.stream
-        
-        # Save to a temporary file in memory
-        with tempfile.NamedTemporaryFile(delete=False, suffix='.docx') as temp_file:
-            file_stream.save(temp_file.name)
-            temp_file_path = temp_file.name
+        # Save the file to a temporary location
+        temp_dir = tempfile.mkdtemp()
+        temp_file_path = os.path.join(temp_dir, secure_filename(file.filename))
+        file.save(temp_file_path)
         
         try:
             # Process the document
@@ -999,13 +996,24 @@ def upload_file():
             return jsonify({'error': f'Error processing file: {str(e)}'}), 500
             
         finally:
-            # Clean up the temporary file
+            # Clean up the temporary file and directory
             try:
-                os.unlink(temp_file_path)
+                if os.path.exists(temp_file_path):
+                    os.unlink(temp_file_path)
+                if os.path.exists(temp_dir):
+                    os.rmdir(temp_dir)
             except Exception as e:
-                print(f"Error removing temporary file {temp_file_path}: {e}")
+                print(f"Error removing temporary files: {e}")
                 
     except Exception as e:
+        # Clean up in case of error
+        if 'temp_dir' in locals() and os.path.exists(temp_dir):
+            try:
+                if 'temp_file_path' in locals() and os.path.exists(temp_file_path):
+                    os.unlink(temp_file_path)
+                os.rmdir(temp_dir)
+            except Exception as cleanup_error:
+                print(f"Error during cleanup: {cleanup_error}")
         return jsonify({'error': f'Error handling file upload: {str(e)}'}), 500
 
 # Vercel handler
