@@ -84,7 +84,7 @@
                 <p class="text-muted" style="font-size: 1.1rem;">Upload your .docx file to check if it meets the required formatting standards</p>
             </div>
             
-            <form id="uploadForm" action="{{ url_for('upload_file') }}" method="post" enctype="multipart/form-data" onsubmit="return validateForm()">
+            <form id="uploadForm" method="post" enctype="multipart/form-data" onsubmit="return submitForm(event)">
                 <div class="upload-area p-5 text-center border-2 border-dashed rounded-3 mb-4" id="drop-area" style="background: #f8f9fa; border-color: #e2e8f0 !important; transition: all 0.3s ease;" onmouseover="this.style.borderColor='#10b981'" onmouseout="this.style.borderColor='#e2e8f0'">
                     <input type="file" name="file" id="file-input" accept=".docx" style="display: none;">
                     <div id="upload-content">
@@ -205,7 +205,9 @@
 
 {% block scripts %}
 <script>
-    function validateForm() {
+    function submitForm(event) {
+        event.preventDefault();
+        
         const fileInput = document.getElementById('file-input');
         if (!fileInput.files || fileInput.files.length === 0) {
             alert('Please select a file to upload');
@@ -221,7 +223,39 @@
         submitText.textContent = 'Processing...';
         spinner.classList.remove('d-none');
         
-        return true;
+        // Create FormData object
+        const formData = new FormData();
+        formData.append('file', fileInput.files[0]);
+        
+        // Submit form via AJAX
+        fetch('{{ url_for("upload_file") }}', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => {
+            if (!response.ok) {
+                return response.json().then(err => { throw err; });
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.error) {
+                throw new Error(data.error);
+            }
+            // Encode the result and redirect to results page
+            const resultJson = encodeURIComponent(JSON.stringify(data.result));
+            window.location.href = `/results?result=${resultJson}`;
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error processing file: ' + (error.message || 'Unknown error occurred'));
+            // Reset form
+            submitBtn.disabled = false;
+            submitText.textContent = 'Check Formatting';
+            spinner.classList.add('d-none');
+        });
+        
+        return false;
     }
     
     // Rest of your existing JavaScript code

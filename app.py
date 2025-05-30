@@ -959,6 +959,42 @@ def clear_all_checks():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
+@app.route('/results')
+def show_results():
+    # Get the result from the URL parameters
+    result_json = request.args.get('result')
+    if not result_json:
+        flash('No results data found. Please upload a document first.')
+        return redirect(url_for('index'))
+    
+    try:
+        # Decode the URL-encoded JSON
+        result = json.loads(result_json)
+        
+        # Ensure all required fields exist with proper defaults
+        summary = result.get('summary', {})
+        line_issues = result.get('line_issues', [])
+        
+        # Convert line_issues to a list of tuples if it's a dict
+        if isinstance(line_issues, dict):
+            line_issues = list(line_issues.items())
+        
+        return render_template('results.html', 
+                           filename=result.get('filename', 'Document'),
+                           summary=summary,
+                           line_issues=line_issues,
+                           headings=result.get('headings', []),
+                           subheadings=result.get('subheadings', []),
+                           issues=result.get('issues', []))
+    except json.JSONDecodeError as e:
+        print(f"Error decoding JSON: {e}")
+        flash('Invalid results data. Please try uploading your document again.')
+        return redirect(url_for('index'))
+    except Exception as e:
+        print(f"Error in show_results: {str(e)}")
+        flash('An error occurred while processing the results.')
+        return redirect(url_for('index'))
+
 @app.route('/upload', methods=['POST'])
 def upload_file():
     # Check if the post request has the file part
@@ -990,19 +1026,18 @@ def upload_file():
         checker = DocumentChecker(temp_file_path)
         issues = checker.check_document()
         
-        try:
-            # Process line issues - ensure they're in the correct format
-            processed_line_issues = []
-            for issue in (checker.line_issues or []):
-                if isinstance(issue, dict) and 'issues' in issue and issue['issues']:
-                    processed_line_issues.append({
-                        'line_number': issue.get('line_number', 0),
-                        'issues': issue['issues'],
-                        'text': issue.get('text', '')
+        # Process line issues - ensure they're in the correct format
+        processed_line_issues = []
+        for issue in (checker.line_issues or []):
+            if isinstance(issue, dict) and 'issues' in issue and issue['issues']:
+                processed_line_issues.append({
+                    'line_number': issue.get('line_number', 0),
+                    'issues': issue['issues'],
+                    'text': issue.get('text', '')
                     })
             
-            # Count lines with issues
-            lines_with_issues = len(processed_line_issues)
+        # Count lines with issues
+        lines_with_issues = len(processed_line_issues)
             
             # Prepare the result
             result = {
