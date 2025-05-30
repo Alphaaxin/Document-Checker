@@ -1,5 +1,6 @@
 from flask import Flask, render_template, request, redirect, url_for, flash, send_from_directory, session, jsonify
 import os
+import tempfile
 from werkzeug.utils import secure_filename
 from docx import Document
 import re
@@ -936,125 +937,76 @@ def clear_all_checks():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
-@app.route('/upload', methods=['GET', 'POST'])
+@app.route('/upload', methods=['POST'])
 def upload_file():
-    if request.method == 'GET':
-        return redirect(url_for('index'))
-    
     # Check if the post request has the file part
     if 'file' not in request.files:
-        flash('No file part in the request', 'error')
-        return redirect(request.url)
+        return jsonify({'error': 'No file part in the request'}), 400
     
     file = request.files['file']
-    
-    # If user does not select file, browser also
-    # submit an empty part without filename
     if file.filename == '':
-        flash('No file selected', 'error')
-        return redirect(request.url)
+        return jsonify({'error': 'No selected file'}), 400
     
-    if file and allowed_file(file.filename):
+    if not (file and allowed_file(file.filename)):
+        return jsonify({'error': 'Invalid file type. Please upload a .docx file'}), 400
+    
+    try:
+        # Process file in memory
+        file_stream = file.stream
+        
+        # Save to a temporary file in memory
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.docx') as temp_file:
+            file_stream.save(temp_file.name)
+            temp_file_path = temp_file.name
+        
         try:
-            # Secure the filename and create full path
-            filename = secure_filename(file.filename)
-            filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            # Process the document
+            checker = DocumentChecker(temp_file_path)
+            issues = checker.check_document()
             
-            # Ensure the upload directory exists
-            os.makedirs(os.path.dirname(filepath), exist_ok=True)
+            # Prepare results
+            result = {
+                'filename': secure_filename(file.filename),
+                'timestamp': datetime.now().isoformat(),
+                'issues': issues,
+                'summary': {
+                    'total_issues': len(issues),
+                    'lines_checked': len(checker.line_issues),
+                    'lines_with_issues': sum(1 for _, data in (checker.line_issues or []) if data and 'issues' in data and data['issues']),
+                    'sections_checked': len(set(getattr(checker, 'sections_checked', []))),
+                    'heading_count': len(getattr(checker, 'headings', [])),
+                    'subheading_count': len(getattr(checker, 'subheadings', []))
+                },
+                'line_issues': [(num, data) for num, data in (checker.line_issues or []) if data and 'issues' in data and data['issues']],
+                'headings': getattr(checker, 'headings', []),
+                'subheadings': getattr(checker, 'subheadings', [])
+            }
             
-            # Save the file
-            if not os.path.exists(filepath):
-                print("hi")
-                file.save(filepath)
+            # Store minimal data in session
+            session['last_result'] = {
+                'filename': result['filename'],
+                'timestamp': result['timestamp'],
+                'summary': result['summary']
+            }
             
-            # Verify the file was saved
-            if not os.path.exists(filepath):
-                flash('Failed to save uploaded file', 'error')
-                return redirect(request.url)
-
-            try:
-                # Process the document
-                checker = DocumentChecker(filepath)
-                results = checker.check_document()
-
-                # Log the document check
-                config.log_document_check(
-                    filename=filename,
-                    issues_found=len(results.get('issues', [])),
-                    user_ip=request.remote_addr,
-                    metadata={
-                        'page_count': len(checker.rules.get('pages', [])),
-                        'line_count': checker.total_lines,
-                        'sections_checked': checker.sections_checked
-                    }
-                )
-
-                # Process line issues to include page numbers
-                line_issues = {}
-                for issue in results.get('line_issues', []):
-                    # Ensure the issue has all required fields
-                    if 'line_number' not in issue or 'text' not in issue or 'issues' not in issue:
-                        continue
-                        
-                    line_num = issue['line_number']
-                    if line_num not in line_issues:
-                        line_issues[line_num] = {
-                            'text': issue.get('text', ''),
-                            'page_number': issue.get('page_number', 1),
-                            'is_page_break': issue.get('is_page_break', False),
-                            'issues': []
-                        }
-                    
-                    # Add issues if they exist
-                    if 'issues' in issue and isinstance(issue['issues'], list):
-                        line_issues[line_num]['issues'].extend(issue['issues'])
-                
-                # Convert to a list of tuples (line_num, data) and sort by page number then line number
-                sorted_line_issues = sorted(
-                    line_issues.items(), 
-                    key=lambda x: (x[1]['page_number'], x[0])
-                )
-                
-                # Debug: Print the first few line issues
-                print("\n=== First 5 Line Issues ===")
-                for i, (line_num, data) in enumerate(sorted_line_issues[:5]):
-                    print(f"Line {line_num} (Page {data['page_number']}): {data['text'][:50]}...")
-                    print(f"  Issues: {data['issues']}")
-                print("===========================\n")
-                
-                return render_template(
-                    'results.html',
-                    issues=results['issues'],
-                    line_issues=sorted_line_issues,
-                    summary=results['summary'],
-                    filename=filename
-                )
-                
-            except Exception as e:
-                # Clean up the uploaded file if there was an error
-                if os.path.exists(filepath):
-                    try:
-                        os.remove(filepath)
-                    except Exception as cleanup_error:
-                        print(f"Error cleaning up file: {cleanup_error}")
-                
-                error_msg = f'Error processing file: {str(e)}'
-                print(error_msg)
-                import traceback
-                traceback.print_exc()
-                
-                flash(error_msg, 'error')
-                return redirect(request.url)
-                
+            # Return only the result data, not the file
+            return jsonify({
+                'success': True,
+                'result': result
+            })
+            
         except Exception as e:
-            error_msg = f'Error handling file upload: {str(e)}'
-            print(error_msg)
-            flash(error_msg, 'error')
-            return redirect(request.url)
-    
-    flash('Invalid file type. Please upload a .docx file')
-    return redirect(request.url)
+            return jsonify({'error': f'Error processing file: {str(e)}'}), 500
+            
+        finally:
+            # Clean up the temporary file
+            try:
+                os.unlink(temp_file_path)
+            except Exception as e:
+                print(f"Error removing temporary file {temp_file_path}: {e}")
+                
+    except Exception as e:
+        return jsonify({'error': f'Error handling file upload: {str(e)}'}), 500
 
 # Vercel handler
 app = app
