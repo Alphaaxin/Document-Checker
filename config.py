@@ -28,17 +28,46 @@ class Config:
     
     @classmethod
     def load(cls, filename='config.json'):
-        if os.path.exists(filename):
-            with open(filename, 'r') as f:
-                data = json.load(f)
-                return cls(**data)
-        return cls()
+        default_config = cls()
+        try:
+            if os.path.exists(filename) and os.access(filename, os.R_OK):
+                with open(filename, 'r') as f:
+                    data = json.load(f)
+                    return cls(**data)
+        except Exception as e:
+            print(f"Warning: Could not load config file: {e}")
+        return default_config
     
     def save(self, filename='config.json'):
-        # Convert to dict and handle any non-serializable fields
-        data = self.__dict__.copy()
-        with open(filename, 'w') as f:
-            json.dump(data, f, indent=4, default=str)
+        try:
+            # Check if we can write to the directory
+            dir_path = os.path.dirname(os.path.abspath(filename))
+            if not os.access(dir_path, os.W_OK):
+                print("Warning: Running in read-only mode, config not saved")
+                return
+                
+            # Convert to dict and handle any non-serializable fields
+            data = self.__dict__.copy()
+            temp_file = f"{filename}.tmp"
+            
+            # Write to temporary file first
+            with open(temp_file, 'w') as f:
+                json.dump(data, f, indent=4, default=str)
+                
+            # Rename temp file to actual file (atomic operation)
+            if os.path.exists(filename):
+                os.replace(temp_file, filename)
+            else:
+                os.rename(temp_file, filename)
+                
+        except Exception as e:
+            print(f"Warning: Could not save config: {e}")
+            # Clean up temp file if it exists
+            if 'temp_file' in locals() and os.path.exists(temp_file):
+                try:
+                    os.unlink(temp_file)
+                except:
+                    pass
     
     def log_document_check(self, filename: str, issues_found: int, user_ip: str, metadata: Dict[str, Any]):
         """Log a document check event"""
