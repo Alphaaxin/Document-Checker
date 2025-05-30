@@ -1,11 +1,37 @@
 #!/bin/bash
-# Install Python dependencies
-pip install -r requirements.txt
+set -e
 
-# Install system dependencies needed for python-docx
-apt-get update && apt-get install -y \
-    python3-dev \
-    libxml2-dev \
-    libxslt1-dev \
-    zlib1g-dev \
-    gcc
+# Install Python dependencies
+pip install --upgrade pip
+pip install -r requirements-vercel.txt
+
+# Create a vercel.json file if it doesn't exist
+if [ ! -f vercel.json ]; then
+    echo '{
+  "version": 2,
+  "builds": [
+    {
+      "src": "app.py",
+      "use": "@vercel/python"
+    },
+    {
+      "src": "templates/*",
+      "use": "@vercel/static"
+    },
+    {
+      "src": "static/*",
+      "use": "@vercel/static"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/static/(.*)",
+      "dest": "/static/$1"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/app.py"
+    }
+  ]
+}' > vercel.json
+fi
