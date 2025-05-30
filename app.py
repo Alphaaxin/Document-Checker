@@ -697,28 +697,46 @@ class DocumentChecker:
                     self.issues.extend(line_issues)
         
         # Check headers and footers
-        header_footer_issues = self.check_headers_footers()
-        if header_footer_issues:
-            self.issues.extend(header_footer_issues)
+        try:
+            header_footer_issues = self.check_headers_footers()
+            if isinstance(header_footer_issues, list) and header_footer_issues:
+                self.issues.extend(header_footer_issues)
+        except Exception as e:
+            print(f"Error checking headers/footers: {e}")
+            self.issues.append("Error checking headers and footers")
+            
+        # Add structure issues from first pass
+        try:
+            if structure_results and isinstance(structure_results, dict):
+                structure_issues = structure_results.get('issues', [])
+                if isinstance(structure_issues, list) and structure_issues:
+                    self.issues.extend(structure_issues)
+        except Exception as e:
+            print(f"Error processing structure results: {e}")
+            self.issues.append("Error processing document structure")
+            
+        # Calculate statistics
+        try:
+            issue_percentage = (self.lines_with_issues / max(1, self.total_lines)) * 100 if self.total_lines > 0 else 0
+        except Exception as e:
+            print(f"Error calculating statistics: {e}")
+            issue_percentage = 0
         
-        # Check page numbering sequence
-        page_num_issues = self.check_page_number_sequence()
-        if page_num_issues:
-            self.issues.extend(page_num_issues)
-        
-        # Calculate total issues
-        total_issues = len(self.issues) + len(self.line_issues)
-        
-        # Create summary
-        summary = {
-            'total_issues': total_issues,
-            'lines_checked': self.total_lines,
-            'lines_with_issues': self.lines_with_issues,
-            'sections_checked': self.sections_checked,
-            'compliance_score': max(0, 100 - (total_issues * 2)),  # Simple scoring (0-100)
-            'heading_count': len(self.headings),
-            'subheading_count': len(self.subheadings),
-            'page_count': len(self.rules.get('pages', [1])) or 1
+        # Prepare result with proper error handling
+        result = {
+            'total_issues': len(self.issues) if hasattr(self, 'issues') else 0,
+            'line_issues': self.line_issues if hasattr(self, 'line_issues') else [],
+            'total_lines': getattr(self, 'total_lines', 0),
+            'lines_with_issues': getattr(self, 'lines_with_issues', 0),
+            'issue_percentage': round(float(issue_percentage), 2),
+            'sections_checked': getattr(self, 'sections_checked', 0),
+            'images_found': getattr(self, 'images_found', 0),
+            'structure_issues': {
+                'missing_sections': structure_results.get('missing_sections', []) if isinstance(structure_results, dict) else [],
+                'extra_sections': structure_results.get('extra_sections', []) if isinstance(structure_results, dict) else []
+            },
+            'pages_skipped': getattr(self, 'pages_skipped', 0),
+            'issues': self.issues if hasattr(self, 'issues') else []
         }
         
         # Process line issues to ensure they have all required fields
