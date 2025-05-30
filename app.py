@@ -1,3 +1,4 @@
+from math import log
 from flask import Flask, render_template, request, redirect, url_for, flash, send_from_directory, session, jsonify
 import os
 import tempfile
@@ -953,31 +954,52 @@ def upload_file():
     if not (file and allowed_file(file.filename)):
         return jsonify({'error': 'Invalid file type. Please upload a .docx file'}), 400
     
+    # Create a temporary file in the system's temp directory
+    temp_file = None
+    temp_file_path = None
+    
     try:
-        # Save the file to a temporary location
-        temp_dir = tempfile.mkdtemp()
-        temp_file_path = os.path.join(temp_dir, secure_filename(file.filename))
-        file.save(temp_file_path)
+        # Save file data to memory
+        file_data = file.read()
+        
+        # Create a temporary file with a .docx extension
+        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.docx')
+        temp_file_path = temp_file.name
+        temp_file.write(file_data)
+        temp_file.close()
+        
+        # Process the document
+        checker = DocumentChecker(temp_file_path)
+        issues = checker.check_document()
         
         try:
-            # Process the document
-            checker = DocumentChecker(temp_file_path)
-            issues = checker.check_document()
+            # Process line issues - ensure they're in the correct format
+            processed_line_issues = []
+            for issue in (checker.line_issues or []):
+                if isinstance(issue, dict) and 'issues' in issue and issue['issues']:
+                    processed_line_issues.append({
+                        'line_number': issue.get('line_number', 0),
+                        'issues': issue['issues'],
+                        'text': issue.get('text', '')
+                    })
             
-            # Prepare results
+            # Count lines with issues
+            lines_with_issues = len(processed_line_issues)
+            
+            # Prepare the result
             result = {
                 'filename': secure_filename(file.filename),
                 'timestamp': datetime.now().isoformat(),
-                'issues': issues,
+                'issues': issues.get('issues', []) if isinstance(issues, dict) else (issues or []),
                 'summary': {
-                    'total_issues': len(issues),
-                    'lines_checked': len(checker.line_issues),
-                    'lines_with_issues': sum(1 for _, data in (checker.line_issues or []) if data and 'issues' in data and data['issues']),
-                    'sections_checked': len(set(getattr(checker, 'sections_checked', []))),
-                    'heading_count': len(getattr(checker, 'headings', [])),
-                    'subheading_count': len(getattr(checker, 'subheadings', []))
+                    'total_issues': len(issues.get('issues', [])) if isinstance(issues, dict) else len(issues or []),
+                    'lines_checked': len(checker.line_issues or []),
+                    'lines_with_issues': lines_with_issues,
+                    'sections_checked': checker.sections_checked if hasattr(checker, 'sections_checked') else 0,
+                    'heading_count': len(checker.headings) if hasattr(checker, 'headings') else 0,
+                    'subheading_count': len(checker.subheadings) if hasattr(checker, 'subheadings') else 0
                 },
-                'line_issues': [(num, data) for num, data in (checker.line_issues or []) if data and 'issues' in data and data['issues']],
+                'line_issues': processed_line_issues,
                 'headings': getattr(checker, 'headings', []),
                 'subheadings': getattr(checker, 'subheadings', [])
             }
@@ -996,28 +1018,22 @@ def upload_file():
             })
             
         except Exception as e:
-            return jsonify({'error': f'Error processing file: {str(e)}'}), 500
+            import traceback
+            traceback.print_exc()
+            return jsonify({'error': f'Error preparing results: {str(e)}'}), 500
             
-        finally:
-            # Clean up the temporary file and directory
-            try:
-                if os.path.exists(temp_file_path):
-                    os.unlink(temp_file_path)
-                if os.path.exists(temp_dir):
-                    os.rmdir(temp_dir)
-            except Exception as e:
-                print(f"Error removing temporary files: {e}")
-                
     except Exception as e:
-        # Clean up in case of error
-        if 'temp_dir' in locals() and os.path.exists(temp_dir):
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': f'Error processing file: {str(e)}'}), 500
+        
+    finally:
+        # Clean up the temporary file
+        if temp_file_path and os.path.exists(temp_file_path):
             try:
-                if 'temp_file_path' in locals() and os.path.exists(temp_file_path):
-                    os.unlink(temp_file_path)
-                os.rmdir(temp_dir)
-            except Exception as cleanup_error:
-                print(f"Error during cleanup: {cleanup_error}")
-        return jsonify({'error': f'Error handling file upload: {str(e)}'}), 500
+                os.unlink(temp_file_path)
+            except Exception as e:
+                print(f"Error removing temporary file: {e}")
 
 # Vercel handler
 app = app
